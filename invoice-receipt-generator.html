@@ -1,0 +1,440 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Sash Afrique — Invoice &amp; Receipt Generator</title>
+<link rel="preconnect" href="https://fonts.googleapis.com/">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Playfair+Display:wght@600;700;800&family=IBM+Plex+Mono:wght@500;600;700&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+<style>
+  :root{
+    --black:#0A0A0A; --panel:#141414; --panel2:#181818; --line:#2a2a2a;
+    --gold:#FAB202; --gold-soft:#7a5a06; --white:#F5F5F2; --muted:#9a9a95; --red:#e05a52; --green:#3fbf72;
+    --radius:14px;
+  }
+  *{box-sizing:border-box;}
+  body{margin:0;background:var(--black);color:var(--white);font-family:'Inter',sans-serif;}
+  h1,h2,h3,.display{font-family:'Playfair Display',serif;}
+  .mono{font-family:'IBM Plex Mono',monospace;font-variant-numeric:tabular-nums;}
+  a{color:var(--gold);}
+
+  .topbar{padding:18px 28px;border-bottom:1px solid var(--line);display:flex;align-items:center;gap:12px;}
+  .topbar img{height:34px;width:auto;}
+  .topbar .t{font-size:19px;font-weight:700;color:var(--gold);}
+  .topbar .sub{color:var(--muted);font-size:12.5px;}
+
+  .layout{display:grid;grid-template-columns:420px 1fr;gap:0;min-height:calc(100vh - 72px);}
+  @media (max-width:980px){.layout{grid-template-columns:1fr;}}
+
+  .panel{padding:22px;border-right:1px solid var(--line);overflow-y:auto;max-height:calc(100vh - 72px);}
+  .preview-wrap{padding:28px;display:flex;flex-direction:column;align-items:center;background:#0d0d0d;overflow-y:auto;max-height:calc(100vh - 72px);}
+
+  .section{margin-bottom:22px;}
+  .section h3{font-size:12.5px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);margin:0 0 10px;font-family:'Inter',sans-serif;font-weight:600;}
+
+  .toggle-row{display:flex;gap:8px;margin-bottom:18px;}
+  .toggle-btn{flex:1;padding:10px;border-radius:10px;border:1px solid var(--line);background:var(--panel);color:var(--muted);font-weight:600;cursor:pointer;font-size:13.5px;transition:.15s;}
+  .toggle-btn.active{background:var(--gold);color:#1a1400;border-color:var(--gold);}
+
+  label{display:block;font-size:12px;color:var(--muted);margin-bottom:4px;}
+  input,select,textarea{width:100%;background:#0f0f0f;border:1px solid var(--line);color:var(--white);border-radius:8px;padding:9px 10px;font-size:13.5px;font-family:inherit;margin-bottom:12px;}
+  input:focus,select:focus,textarea:focus{outline:none;border-color:var(--gold);}
+  textarea{resize:vertical;min-height:56px;}
+  .row2{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
+  .row3{display:grid;grid-template-columns:2fr 0.8fr 1fr auto;gap:8px;align-items:center;}
+
+  .item-row{margin-bottom:8px;}
+  .item-row input{margin-bottom:0;}
+  .btn{background:var(--gold);color:#1a1400;border:none;border-radius:8px;padding:10px 16px;font-weight:700;cursor:pointer;font-size:13.5px;}
+  .btn:hover{filter:brightness(1.08);}
+  .btn-ghost{background:transparent;border:1px solid var(--line);color:var(--white);border-radius:8px;padding:8px 12px;cursor:pointer;font-size:12.5px;}
+  .btn-ghost:hover{border-color:var(--gold);color:var(--gold);}
+  .row-del{background:transparent;border:none;color:var(--red);cursor:pointer;font-size:16px;line-height:1;padding:6px;}
+
+  .actions{display:flex;gap:10px;margin-top:20px;}
+  .actions .btn{flex:1;text-align:center;}
+
+  .saved-list{max-height:180px;overflow-y:auto;border:1px solid var(--line);border-radius:10px;}
+  .saved-item{padding:9px 12px;border-bottom:1px solid var(--line);display:flex;justify-content:space-between;align-items:center;font-size:12.5px;cursor:pointer;}
+  .saved-item:last-child{border-bottom:none;}
+  .saved-item:hover{background:var(--panel2);}
+  .saved-item .num{color:var(--gold);font-weight:600;}
+  .saved-item .amt{color:var(--muted);}
+
+  /* ---------- DOCUMENT PREVIEW ---------- */
+  #docStage{width:794px;max-width:100%;}
+  #doc{
+    width:794px; min-height:1000px; background:linear-gradient(160deg,#141414 0%, #0c0c0c 100%);
+    border:1px solid var(--gold-soft); border-radius:6px; padding:48px 52px; position:relative; box-shadow:0 20px 60px rgba(0,0,0,.5);
+  }
+  .doc-head{display:flex;justify-content:space-between;align-items:flex-start;border-bottom:2px solid var(--gold);padding-bottom:22px;margin-bottom:26px;}
+  .doc-brand{display:flex;gap:14px;align-items:center;}
+  .doc-brand img{height:52px;width:auto;}
+  .doc-brand .co-name{font-size:22px;font-weight:700;color:var(--gold);line-height:1.15;}
+  .doc-brand .co-meta{font-size:11px;color:var(--muted);line-height:1.5;margin-top:3px;}
+  .doc-type{text-align:right;}
+  .doc-type .badge{display:inline-block;padding:5px 16px;border:1.5px solid var(--gold);border-radius:99px;color:var(--gold);font-weight:700;letter-spacing:.08em;font-size:13px;text-transform:uppercase;}
+  .doc-type .num{margin-top:10px;font-size:15px;font-weight:600;}
+  .doc-type .date{color:var(--muted);font-size:12px;margin-top:2px;}
+
+  .doc-meta-row{display:flex;justify-content:space-between;margin-bottom:26px;gap:24px;}
+  .doc-meta-col h4{font-size:10.5px;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);margin:0 0 6px;font-weight:600;font-family:'Inter';}
+  .doc-meta-col .name{font-size:15px;font-weight:600;}
+  .doc-meta-col .line{font-size:12.5px;color:#cfcfc9;margin-top:2px;}
+
+  table.items{width:100%;border-collapse:collapse;margin-bottom:20px;}
+  table.items thead th{text-align:left;font-size:10.5px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);border-bottom:1px solid var(--line);padding:8px 6px;font-weight:600;}
+  table.items thead th.num{text-align:right;}
+  table.items tbody td{padding:10px 6px;font-size:13px;border-bottom:1px solid #232323;}
+  table.items tbody td.num{text-align:right;}
+
+  .totals{display:flex;justify-content:flex-end;margin-bottom:24px;}
+  .totals table{border-collapse:collapse;min-width:260px;}
+  .totals td{padding:6px 4px;font-size:13px;}
+  .totals td.label{color:var(--muted);text-align:right;padding-right:16px;}
+  .totals td.val{text-align:right;min-width:100px;}
+  .totals tr.grand td{border-top:1.5px solid var(--gold);padding-top:10px;font-size:16px;font-weight:700;color:var(--gold);}
+  .totals tr.paid td{color:var(--green);}
+  .totals tr.due td{color:var(--red);font-weight:700;}
+
+  .pay-box{background:rgba(250,178,2,.07);border:1.5px solid var(--gold);border-radius:10px;padding:18px 20px;margin-bottom:22px;}
+  .pay-box h4{font-size:12.5px;text-transform:uppercase;letter-spacing:.08em;color:var(--gold);margin:0 0 12px;font-weight:700;}
+  .pay-box .row{display:flex;justify-content:space-between;align-items:baseline;font-size:14px;padding:8px 0;border-bottom:1px dashed rgba(255,255,255,.1);gap:16px;}
+  .pay-box .row:last-child{border-bottom:none;}
+  .pay-box .row span:first-child{color:#cfcfc9;font-weight:500;white-space:nowrap;font-family:'Inter',sans-serif;}
+  .pay-box .row span:last-child{font-weight:700;color:var(--white);font-family:'Inter',sans-serif;font-size:16px;letter-spacing:.02em;text-align:right;}
+
+  .doc-notes{font-size:12px;color:var(--muted);margin-bottom:24px;line-height:1.6;}
+  .doc-footer{border-top:1px solid var(--line);padding-top:18px;display:flex;justify-content:space-between;align-items:flex-end;}
+  .doc-footer .thanks{font-family:'Playfair Display',serif;font-size:14px;color:var(--gold);font-style:italic;}
+  .doc-footer .sig{text-align:center;}
+  .doc-footer .sig .line{border-top:1px solid var(--muted);width:150px;margin-bottom:4px;}
+  .doc-footer .sig .cap{font-size:10.5px;color:var(--muted);}
+
+  @media print{
+    body *{visibility:hidden;}
+    #doc, #doc *{visibility:visible;}
+    #doc{position:absolute;left:0;top:0;box-shadow:none;}
+  }
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <img src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAQsAAAC8CAMAAABYM3sZAAAAolBMVEUAAADzuFL///8AAAP5vFSdejpNPBz5wFg8LxXvt1XyuFSAGj8AdWI1NTVXV1dTFSkEcWBzGjoDRDkICAirq6vNzc1zc3OTk5Pi4uLPz8+kpKTq6uq/v7/uulIgICAXFxfY2NhFRUUWDQefn59jY2OKiop0dHSCgoJjSiUsLCy1tbUuLi729vZbW1sNBQnn5+dLS0tpaWkCDgwfGAwXFAw7OzuniwmzAAAEFUlEQVR4nO3bfXebNhQG8Lubbem6OVuHMOJlRkwBYkyWeJu//1fblcCW7eactDulxs3z+yPIQhB4JAQnOEQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAF/QzXQufWrwf93Qw/ufpvPHn5c+wc8gWXz/3XSQBbJAFt9YFhO6vaYsiN79MKXo0qc3I1f2uDXhc+eVJQGfRLr1tY59I33/+y/Occ2Cncfjqg8/i1+/7oFdgM/it+OaIYu74ypkESCLAFkEyCJAFgGyCJBFgCwCZBEgiwBZBMgiQBYBsgiQRYAsAmQRIIsAWQTIIkAWwVvK4uSdwO7NvhOI/nZOqlbOydviv7yvelwAcDn//Dila3rzfEMPt1O6ru8oPdy+n87VfXcN3+MbIIsAWQRu7pzw651XlsW/76Z06fObj2t6ugAAgPkrrbKblqjFv1KIjMo+KvtLH0ZQFdrYl7pGJec13XJYRk+cD6XF6V9/X6aex8J6ESpN5bJYW2uT8vMOeDr3XLQ25+3Ha9LurKLmsQuTnNZDKSoW9CpuxoIyR5V38pnWSVLPJ4s8cz8z33Xlaqz0y7gbC4emajwrG481+7NYfTyuorApj8OJsnTcrByyaGglfbCcTRZ8vy/Znjl3L38SZo53FCslFc+HlvdMnXYFzdynZJqEY2IZF3e5tF9xRJ0fSWktV4ORNvsI9lkM29FOlnp1+pppHnRejSUrfWS5pEd+pl0hWbAqqeBDSxPL9ODOoOpMVZF+SmVL3lHFKiKrJYui8HtMaMVdScv9XLLPoircdqXkRm0+xyw2OfdFc/jY11SPs0LsR/RhgO8kIpcHjWPd+DEi4yL17brjLArfrNbDloddKNdS+Wm35jDgZuQu09xv/A0ltdrSmvPEXeyxcmvzdmxWuDN7ZGk4ZKH9bUayGCaR5+MsertdLrfNOKZOs5DfIMo5jgtvnRs5zW7bJL0caZTlMhP4uTNkUXK9WSxWuQtoyKJ21S4LfymsT7LQRmttXhwXfT1UzjULki5M/TBIfa9R1auzLCyP6DyL3g+Q7XEWh8HknWZh/G4XM7xGNnrnFnIBGHdzLdlS5W6QXXyWBScUCbc8y0L5+cVIFtaV1tKi9lfHZrzTHh5efBYtuwuwmGEWq5TjJDEyYhtWjc1zK4epmkxutelxFvX+fpJJITNSeBrmC4ky7+v2SUkWERu3C1lR9Enb8XA1EJvYuZdf0cq6lJPWFLO8Rh47Y5SbEe9j3UWtPG5sCx3LkbZ+aCfDMdf7UV+qBW3dh8RPE8p1sjXpkiQLWnW6K2u3opGd7c8285R8TLS7EGtjaso+4YH1WrlnLRiskcVB1L7eBgAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAODb9x+4SnWlG1jWIQAAAABJRU5ErkJggg==" alt="Sash Afrique">
+  <div>
+    <div class="t">Sash Afrique</div>
+    <div class="sub">Invoice &amp; Receipt Generator</div>
+  </div>
+</div>
+
+<div class="layout">
+  <!-- ==================== FORM PANEL ==================== -->
+  <div class="panel">
+
+    <div class="toggle-row">
+      <button class="toggle-btn active" id="btnInvoice" onclick="setDocType('invoice')">Invoice</button>
+      <button class="toggle-btn" id="btnReceipt" onclick="setDocType('receipt')">Receipt</button>
+    </div>
+
+    <div class="section">
+      <h3>Document Details</h3>
+      <div class="row2">
+        <div><label>Order / Invoice Number</label><input id="docNumber" placeholder="e.g. SA-0001"></div>
+        <div><label>Date</label><input type="date" id="docDate"></div>
+      </div>
+      <div id="dueDateWrap" class="row2">
+        <div><label>Due Date (optional)</label><input type="date" id="dueDate"></div>
+        <div></div>
+      </div>
+    </div>
+
+    <div class="section">
+      <h3>Achiever (Customer)</h3>
+      <label>Full Name</label><input id="custName" placeholder="e.g. Yaw Serlom">
+      <div class="row2">
+        <div><label>Phone</label><input id="custPhone" placeholder="024 XXX XXXX"></div>
+        <div><label>Email (optional)</label><input id="custEmail" placeholder=""></div>
+      </div>
+      <label>Delivery / Address (optional)</label><input id="custAddress" placeholder="">
+    </div>
+
+    <div class="section">
+      <h3>Items</h3>
+      <div id="itemsList"></div>
+      <button class="btn-ghost" onclick="addItem()">+ Add item</button>
+    </div>
+
+    <div class="section">
+      <h3>Payment</h3>
+      <div class="row2">
+        <div><label>Tax Rate % (leave 0 if none)</label><input type="number" id="taxRate" value="0" step="0.1"></div>
+        <div><label>Payment Method</label>
+          <select id="payMethod">
+            <option>MTN MoMo</option>
+            <option>Bank Transfer</option>
+            <option>Cash</option>
+          </select>
+        </div>
+      </div>
+      <label>Amount Paid (GH₵)</label><input type="number" id="amountPaid" value="0" step="0.01">
+    </div>
+
+    <div class="section">
+      <h3>Notes (optional)</h3>
+      <textarea id="notes" placeholder="e.g. Thank you for your custom order. Delivery within 5 working days."></textarea>
+    </div>
+
+    <div class="actions">
+      <button class="btn" onclick="generatePDF()" style="width:100%;">Generate PDF</button>
+    </div>
+
+  </div>
+
+  <!-- ==================== PREVIEW PANEL ==================== -->
+  <div class="preview-wrap">
+    <div id="docStage">
+      <div id="doc">
+        <div class="doc-head">
+          <div class="doc-brand">
+            <img src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAQsAAAC8CAMAAABYM3sZAAAAolBMVEUAAADzuFL///8AAAP5vFSdejpNPBz5wFg8LxXvt1XyuFSAGj8AdWI1NTVXV1dTFSkEcWBzGjoDRDkICAirq6vNzc1zc3OTk5Pi4uLPz8+kpKTq6uq/v7/uulIgICAXFxfY2NhFRUUWDQefn59jY2OKiop0dHSCgoJjSiUsLCy1tbUuLi729vZbW1sNBQnn5+dLS0tpaWkCDgwfGAwXFAw7OzuniwmzAAAEFUlEQVR4nO3bfXebNhQG8Lubbem6OVuHMOJlRkwBYkyWeJu//1fblcCW7eactDulxs3z+yPIQhB4JAQnOEQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAF/QzXQufWrwf93Qw/ufpvPHn5c+wc8gWXz/3XSQBbJAFt9YFhO6vaYsiN79MKXo0qc3I1f2uDXhc+eVJQGfRLr1tY59I33/+y/Occ2Cncfjqg8/i1+/7oFdgM/it+OaIYu74ypkESCLAFkEyCJAFgGyCJBFgCwCZBEgiwBZBMgiQBYBsgiQRYAsAmQRIIsAWQTIIkAWwVvK4uSdwO7NvhOI/nZOqlbOydviv7yvelwAcDn//Dila3rzfEMPt1O6ru8oPdy+n87VfXcN3+MbIIsAWQRu7pzw651XlsW/76Z06fObj2t6ugAAgPkrrbKblqjFv1KIjMo+KvtLH0ZQFdrYl7pGJec13XJYRk+cD6XF6V9/X6aex8J6ESpN5bJYW2uT8vMOeDr3XLQ25+3Ha9LurKLmsQuTnNZDKSoW9CpuxoIyR5V38pnWSVLPJ4s8cz8z33Xlaqz0y7gbC4emajwrG481+7NYfTyuorApj8OJsnTcrByyaGglfbCcTRZ8vy/Znjl3L38SZo53FCslFc+HlvdMnXYFzdynZJqEY2IZF3e5tF9xRJ0fSWktV4ORNvsI9lkM29FOlnp1+pppHnRejSUrfWS5pEd+pl0hWbAqqeBDSxPL9ODOoOpMVZF+SmVL3lHFKiKrJYui8HtMaMVdScv9XLLPoircdqXkRm0+xyw2OfdFc/jY11SPs0LsR/RhgO8kIpcHjWPd+DEi4yL17brjLArfrNbDloddKNdS+Wm35jDgZuQu09xv/A0ltdrSmvPEXeyxcmvzdmxWuDN7ZGk4ZKH9bUayGCaR5+MsertdLrfNOKZOs5DfIMo5jgtvnRs5zW7bJL0caZTlMhP4uTNkUXK9WSxWuQtoyKJ21S4LfymsT7LQRmttXhwXfT1UzjULki5M/TBIfa9R1auzLCyP6DyL3g+Q7XEWh8HknWZh/G4XM7xGNnrnFnIBGHdzLdlS5W6QXXyWBScUCbc8y0L5+cVIFtaV1tKi9lfHZrzTHh5efBYtuwuwmGEWq5TjJDEyYhtWjc1zK4epmkxutelxFvX+fpJJITNSeBrmC4ky7+v2SUkWERu3C1lR9Enb8XA1EJvYuZdf0cq6lJPWFLO8Rh47Y5SbEe9j3UWtPG5sCx3LkbZ+aCfDMdf7UV+qBW3dh8RPE8p1sjXpkiQLWnW6K2u3opGd7c8285R8TLS7EGtjaso+4YH1WrlnLRiskcVB1L7eBgAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAODb9x+4SnWlG1jWIQAAAABJRU5ErkJggg==" alt="logo">
+            <div>
+              <div class="co-name">Sash Afrique Ltd</div>
+              <div class="co-meta" id="coMeta">
+                Ashaiman, Greater Accra, Ghana<br>
+                +233 24 000 0000 &nbsp;·&nbsp; hello@sashafrique.com
+              </div>
+            </div>
+          </div>
+          <div class="doc-type">
+            <div class="badge" id="badgeType">Invoice</div>
+            <div class="num mono" id="previewNumber">SA-000000</div>
+            <div class="date" id="previewDate">7 July 2026</div>
+          </div>
+        </div>
+
+        <div class="doc-meta-row">
+          <div class="doc-meta-col">
+            <h4 id="billToLabel">Bill To</h4>
+            <div class="name" id="pvName">—</div>
+            <div class="line" id="pvPhone"></div>
+            <div class="line" id="pvEmail"></div>
+            <div class="line" id="pvAddress"></div>
+          </div>
+          <div class="doc-meta-col" style="text-align:right;">
+            <h4>Payment Method</h4>
+            <div class="name" id="pvMethod">—</div>
+            <div class="line" id="pvDue"></div>
+          </div>
+        </div>
+
+        <table class="items">
+          <thead>
+            <tr><th>Description</th><th class="num">Qty</th><th class="num">Unit Price</th><th class="num">Amount</th></tr>
+          </thead>
+          <tbody id="pvItems"></tbody>
+        </table>
+
+        <div class="totals">
+          <table>
+            <tr><td class="label">Subtotal</td><td class="val mono" id="pvSubtotal">GH₵0.00</td></tr>
+            <tr id="taxRow" style="display:none;"><td class="label">Tax</td><td class="val mono" id="pvTax">GH₵0.00</td></tr>
+            <tr class="grand"><td class="label">Total</td><td class="val mono" id="pvTotal">GH₵0.00</td></tr>
+            <tr class="paid" id="paidRow"><td class="label">Amount Paid</td><td class="val mono" id="pvPaid">GH₵0.00</td></tr>
+            <tr class="due" id="dueRow"><td class="label">Balance Due</td><td class="val mono" id="pvDueAmt">GH₵0.00</td></tr>
+          </table>
+        </div>
+
+        <div class="pay-box" id="payBox">
+          <h4>Please Make Payment To</h4>
+          <div class="row"><span>MTN MoMo</span><span>024 000 0000 (Sash Afrique Ltd)</span></div>
+          <div class="row"><span>Bank</span><span>Fidelity Bank — 0012345678901</span></div>
+          <div class="row"><span>Account Name</span><span>Sash Afrique Ltd</span></div>
+        </div>
+
+        <div class="doc-notes" id="pvNotes"></div>
+
+        <div class="doc-footer">
+          <div class="thanks">Thank you for choosing Sash Afrique</div>
+          <div class="sig">
+            <div class="line"></div>
+            <div class="cap">Authorised Signature</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+/* ================= CONFIG — edit these once ================= */
+const COMPANY = {
+  name: 'Sash Afrique Ltd',
+  address: 'DN106 Agenda St, GW-0968-4696, Accra, Ghana',
+  phone: '0240 110 854',
+  email: 'sashafrique4@gmail.com',
+  momo: '0544 136 917 (Sash Afrique Ltd)',
+  bank: 'Fidelity Bank, Adjen Kotoku Branch — 1050880681119',
+  bankAccName: 'Sash Afrique Ltd',
+  tin: '' // fill in once tax certificate is issued, e.g. 'TIN: C0012345678'
+};
+
+/* ================= STATE ================= */
+let docType = 'invoice'; // 'invoice' | 'receipt'
+let items = [{ desc:'', qty:1, price:0, id:1 }];
+let nextItemId = 2;
+
+/* ================= INIT ================= */
+function todayISO(){ return new Date().toISOString().slice(0,10); }
+function fmt(n){ return 'GH₵'+ (Number(n)||0).toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2}); }
+function fmtDate(iso){
+  if(!iso) return '';
+  const d = new Date(iso+'T00:00:00');
+  return d.toLocaleDateString('en-GB',{day:'numeric',month:'long',year:'numeric'});
+}
+function fmtDateShort(iso){
+  if(!iso) return '';
+  const d = new Date(iso+'T00:00:00');
+  const dd = String(d.getDate()).padStart(2,'0');
+  const mm = String(d.getMonth()+1).padStart(2,'0');
+  return dd+'/'+mm+'/'+d.getFullYear();
+}
+
+function init(){
+  document.getElementById('docDate').value = todayISO();
+  document.getElementById('docNumber').placeholder = 'e.g. SA-0001';
+  document.getElementById('coMeta').innerHTML = COMPANY.address+'<br>'+COMPANY.phone+' &nbsp;·&nbsp; '+COMPANY.email + (COMPANY.tin ? '<br>'+COMPANY.tin : '');
+  document.getElementById('payBox').innerHTML = '<h4>Please Make Payment To</h4>'+
+    '<div class="row"><span>MTN MoMo</span><span>'+COMPANY.momo+'</span></div>'+
+    '<div class="row"><span>Bank</span><span>'+COMPANY.bank+'</span></div>'+
+    '<div class="row"><span>Account Name</span><span>'+COMPANY.bankAccName+'</span></div>';
+  renderItems();
+  ['docNumber','docDate','dueDate','custName','custPhone','custEmail','custAddress','taxRate','payMethod','amountPaid','notes'].forEach(id=>{
+    document.getElementById(id).addEventListener('input', renderPreview);
+    document.getElementById(id).addEventListener('change', renderPreview);
+  });
+  setDocType('invoice');
+}
+
+/* ================= ITEMS ================= */
+function addItem(){
+  items.push({ desc:'', qty:1, price:0, id: nextItemId++ });
+  renderItems();
+}
+function removeItem(id){
+  items = items.filter(i=>i.id!==id);
+  if(items.length===0) items.push({desc:'',qty:1,price:0,id:nextItemId++});
+  renderItems();
+}
+function updateItem(id, field, value){
+  const it = items.find(i=>i.id===id);
+  if(!it) return;
+  it[field] = field==='desc' ? value : parseFloat(value)||0;
+  renderPreview();
+}
+function renderItems(){
+  const wrap = document.getElementById('itemsList');
+  wrap.innerHTML = items.map(it=>`
+    <div class="item-row row3">
+      <input placeholder="Description" value="${it.desc}" oninput="updateItem(${it.id},'desc',this.value)">
+      <input type="number" placeholder="Qty" value="${it.qty}" min="0" step="1" oninput="updateItem(${it.id},'qty',this.value)">
+      <input type="number" placeholder="Unit price" value="${it.price}" min="0" step="0.01" oninput="updateItem(${it.id},'price',this.value)">
+      <button class="row-del" onclick="removeItem(${it.id})" title="Remove">✕</button>
+    </div>`).join('');
+  renderPreview();
+}
+
+/* ================= DOC TYPE TOGGLE ================= */
+function setDocType(type){
+  docType = type;
+  document.getElementById('btnInvoice').classList.toggle('active', type==='invoice');
+  document.getElementById('btnReceipt').classList.toggle('active', type==='receipt');
+  document.getElementById('dueDateWrap').style.display = type==='invoice' ? 'grid' : 'none';
+  renderPreview();
+}
+
+/* ================= PREVIEW RENDER ================= */
+function renderPreview(){
+  const num = document.getElementById('docNumber').value || 'SA-000000';
+  const date = document.getElementById('docDate').value;
+  const due = document.getElementById('dueDate').value;
+  const name = document.getElementById('custName').value || '—';
+  const phone = document.getElementById('custPhone').value;
+  const email = document.getElementById('custEmail').value;
+  const address = document.getElementById('custAddress').value;
+  const method = document.getElementById('payMethod').value;
+  const taxRate = parseFloat(document.getElementById('taxRate').value)||0;
+  const amountPaid = parseFloat(document.getElementById('amountPaid').value)||0;
+  const notes = document.getElementById('notes').value;
+
+  document.getElementById('badgeType').textContent = docType==='invoice' ? 'Invoice' : 'Receipt';
+  document.getElementById('billToLabel').textContent = docType==='invoice' ? 'Bill To' : 'Received From';
+  document.getElementById('previewNumber').textContent = num;
+  document.getElementById('previewDate').textContent = fmtDate(date);
+  document.getElementById('pvName').textContent = name;
+  document.getElementById('pvPhone').textContent = phone;
+  document.getElementById('pvEmail').textContent = email;
+  document.getElementById('pvAddress').textContent = address;
+  document.getElementById('pvMethod').textContent = method;
+  document.getElementById('pvDue').textContent = (docType==='invoice' && due) ? ('Due: '+fmtDateShort(due)) : '';
+  document.getElementById('pvDue').style.display = (docType==='invoice' && due) ? 'block' : 'none';
+
+  document.getElementById('pvItems').innerHTML = items.map(it=>{
+    const lineTotal = (it.qty||0)*(it.price||0);
+    return `<tr><td>${it.desc||'—'}</td><td class="num">${it.qty||0}</td><td class="num mono">${fmt(it.price)}</td><td class="num mono">${fmt(lineTotal)}</td></tr>`;
+  }).join('');
+
+  const subtotal = items.reduce((s,it)=>s+(it.qty||0)*(it.price||0),0);
+  const tax = subtotal * (taxRate/100);
+  const total = subtotal + tax;
+  const balance = total - amountPaid;
+
+  document.getElementById('pvSubtotal').textContent = fmt(subtotal);
+  document.getElementById('pvTax').textContent = fmt(tax);
+  document.getElementById('taxRow').style.display = taxRate>0 ? 'table-row' : 'none';
+  document.getElementById('pvTotal').textContent = fmt(total);
+  document.getElementById('pvPaid').textContent = fmt(amountPaid);
+  document.getElementById('pvDueAmt').textContent = fmt(Math.max(balance,0));
+
+  const paidRow = document.getElementById('paidRow');
+  const dueRow = document.getElementById('dueRow');
+
+  paidRow.style.display = amountPaid>0 ? 'table-row' : 'none';
+  dueRow.style.display = (balance>0.004) ? 'table-row' : 'none';
+
+  document.getElementById('payBox').style.display = (docType==='invoice' && balance>0.004) ? 'block' : (docType==='receipt' ? 'none' : 'block');
+  document.getElementById('pvNotes').textContent = notes;
+}
+
+/* ================= PDF GENERATION ================= */
+function generatePDF(){
+  const el = document.getElementById('doc');
+  const num = document.getElementById('docNumber').value || 'document';
+  const label = docType==='invoice' ? 'Invoice' : 'Receipt';
+  html2canvas(el, { scale: 2, backgroundColor:'#0c0c0c' }).then(canvas=>{
+    const imgData = canvas.toDataURL('image/png');
+    const { jsPDF } = window.jspdf;
+    const pdf = new jsPDF({ unit:'pt', format:'a4' });
+    const pageWidth = pdf.internal.pageSize.getWidth();
+    const pageHeight = pdf.internal.pageSize.getHeight();
+    const imgW = pageWidth;
+    const imgH = (canvas.height * imgW) / canvas.width;
+    let heightLeft = imgH, position = 0;
+    pdf.addImage(imgData,'PNG',0,position,imgW,imgH);
+    heightLeft -= pageHeight;
+    while(heightLeft > 0){
+      position = heightLeft - imgH;
+      pdf.addPage();
+      pdf.addImage(imgData,'PNG',0,position,imgW,imgH);
+      heightLeft -= pageHeight;
+    }
+    pdf.save(label+'-'+num+'.pdf');
+  });
+}
+
+init();
+</script>
+</body>
+</html>
